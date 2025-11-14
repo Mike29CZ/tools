@@ -213,21 +213,22 @@ func findBlockParent(hn *html.Node) *html.Node {
 	return nil
 }
 
-// nodeAttr returns node attribute value of the key name.
-// Attribute keys are case insensitive.
-func nodeAttr(n *html.Node, name string) string {
-	name = strings.ToLower(name)
-	for _, a := range n.Attr {
-		if strings.ToLower(a.Key) == name {
-			return a.Val
+// nodeAttr checks the given node's HTML attributes for the given key.
+// The corresponding value is returned, or the empty string if the key is not found.
+// Keys are case insensitive.
+func nodeAttr(n *html.Node, key string) string {
+	key = strings.ToLower(key)
+	for _, attr := range n.Attr {
+		if strings.ToLower(attr.Key) == key {
+			return attr.Val
 		}
 	}
 	return ""
 }
 
 // stringifyNode extracts and concatenates all text nodes starting with root.
-// Line breaks are inserted at <br> and any non-<span> elements.
-func stringifyNode(root *html.Node, trim bool) string {
+// Line breaks are inserted at <br> and any non-<span> elements if requested.
+func stringifyNode(root *html.Node, trim bool, lineBreak bool) string {
 	if root.Type == html.TextNode {
 		s := textCleaner.Replace(root.Data)
 		if !trim {
@@ -236,7 +237,10 @@ func stringifyNode(root *html.Node, trim bool) string {
 		return strings.TrimSpace(s)
 	}
 	if root.DataAtom == atom.Br && !trim {
-		return "\n"
+		if lineBreak {
+			return "\n"
+		}
+		return ""
 	}
 	var buf bytes.Buffer
 	for c := root.FirstChild; c != nil; c = c.NextSibling {
@@ -248,7 +252,9 @@ func stringifyNode(root *html.Node, trim bool) string {
 			}
 		}
 		if c.DataAtom == atom.Br {
-			buf.WriteRune('\n')
+			if lineBreak {
+				buf.WriteRune('\n')
+			}
 			continue
 		}
 		if c.Type == html.TextNode {
@@ -256,9 +262,11 @@ func stringifyNode(root *html.Node, trim bool) string {
 			continue
 		}
 		if c.DataAtom != atom.Span && c.DataAtom != atom.A {
-			buf.WriteRune('\n')
+			if lineBreak {
+				buf.WriteRune('\n')
+			}
 		}
-		buf.WriteString(stringifyNode(c, false))
+		buf.WriteString(stringifyNode(c, false, lineBreak))
 	}
 	s := textCleaner.Replace(buf.String())
 	if !trim {

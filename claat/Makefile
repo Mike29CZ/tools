@@ -25,39 +25,31 @@ RELEASES=$(OUTDIR)/claat-darwin-amd64 \
 	 $(OUTDIR)/claat-windows-amd64.exe \
 	 $(OUTDIR)/claat-windows-386.exe
 
-SRCS = $(shell find . -name '*.go') render/tmpldata.go
+ifeq ($(OS), Windows_NT)
+		SRCS = $(shell dir *.go /b/s) 
+	else
+		SRCS = $(shell find . -name '*.go') 
+endif
 
-all: $(OUTDIR)/claat $(OUTDIR)/claat2
+all: $(OUTDIR)/claat
 
 $(OUTDIR)/claat: $(SRCS) VERSION
-	go build -o $@ -ldflags "-X main.version=$(VERSION) -X main.useElements=false"
+	go build -o $@ -ldflags "-X main.version=$(VERSION)"
 
-$(OUTDIR)/claat2: $(SRCS) VERSION
-	go build -o $@ -ldflags "-X main.version=$(VERSION) -X main.useElements=true"
-
-serve: $(OUTDIR)/claat2
+serve: $(OUTDIR)/claat
 	mkdir -p $(OUTDIR)/deps
 	cd ../; \
 	    bazel build :bundle; \
 	    mv -f bazel-genfiles/bundle.zip claat/$(OUTDIRNAME)/deps
 	unzip -o $(OUTDIR)/deps/bundle.zip -d $(OUTDIR)/deps/codelab-elements
-	cd bin; ./claat2 serve
+	cd bin; ./claat serve
 
 release: $(RELEASES)
 	echo $(VERSION) > $(OUTDIR)/VERSION
-	cd $(OUTDIR) && sha1sum claat-* > sha1sum.txt
-
-test: .test
-.test: $(SRCS)
-	go test ./... && touch .test
-
-lint: .lint
-.lint: $(SRCS)
-	go vet ./...
-	golint ./... && touch .lint
+	cd $(OUTDIR) && sha1sum claat* > sha1sum.txt
 
 clean:
-	rm -rf $(OUTDIR) render/tmpldata.go .test .lint
+	rm -rf $(OUTDIR) render/tmpldata.go 
 
 $(OUTDIR)/claat-%: GOOS=$(firstword $(subst -, ,$*))
 $(OUTDIR)/claat-%: GOARCH=$(subst .exe,,$(word 2,$(subst -, ,$*)))
@@ -67,5 +59,5 @@ $(OUTDIR)/claat-%: $(SRCS) VERSION
 		-ldflags "-X main.version=$(VERSION) -s -w" \
 		-o $@
 
-%/tmpldata.go: %/gen-tmpldata.go %/template-elements.html %/template.html %/template.md %/template-offline.html
+%/tmpldata.go: %/gen-tmpldata.go %/template.html %/template.md %/template-offline.html
 	cd $* && go generate
